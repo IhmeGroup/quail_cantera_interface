@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <omp.h>
+#include "helpers.h"
 
 extern "C" {
 
@@ -22,11 +23,10 @@ void get_massfractions(const int nsp, const double rho, const double *rhoY, doub
     Ys.append(Ynames[nsp - 1] + ": " + std::to_string(Y_last));
 }
 
-
-void get_pressure(const double* Uq, double* P, int ne, int nq, 
+void get_pressure_update(const double* Uq, double* P, int ne, int nq, 
     int ns, int nsp, int dim, char* filename)
 {
-
+double T_final; // converged Temperature
 // Create a new phase
 std::unique_ptr<ThermoPhase> gas(newPhase(filename));
 // IdealGasMix gas(filename);
@@ -39,15 +39,55 @@ std::unique_ptr<ThermoPhase> gas(newPhase(filename));
             const double rho = U[0];
             const double rhou = U[1];
             const double rhoE = U[2];
-
+            double T_guess = 350.0;
             auto e = rhoE / rho - 0.5 * rhou * rhou / rho;
-            auto nu = 1.0 / rho;
 
             double Y[nsp];
             std::string Y_string;
             get_massfractions(nsp, rho, U + dim + 2, Y, Y_string, gas->speciesNames());
-            gas->setMassFractionsByName(Y_string);
-            gas->setState_UV(e, nu);
+            set_mixture_TRY(gas, T_guess, rho, Y);
+
+            T_final = get_temperature_from_energy(gas, e);
+            gas->setTemperature(T_final);
+
+            // gas->setMassFractionsByName(Y_string);
+            // gas->setState_UV(e, nu);
+            P[ie * (nq) + iq] = gas->pressure();
+        }
+    }
+} // end get_pressure
+
+
+
+void get_pressure(const double* Uq, double* P, int ne, int nq, 
+    int ns, int nsp, int dim, char* filename)
+{
+double T_final; // converged Temperature
+// Create a new phase
+std::unique_ptr<ThermoPhase> gas(newPhase(filename));
+// IdealGasMix gas(filename);
+// #pragma omp parallel for schedule(static, 1)
+    for (int ie = 0; ie < ne; ie++){
+        for (int iq = 0; iq < nq; iq++){
+
+            auto start = ie * (nq*ns) + iq * ns;
+            const double *U = Uq + start;
+            const double rho = U[0];
+            const double rhou = U[1];
+            const double rhoE = U[2];
+            double T_guess = 350.0;
+            auto e = rhoE / rho - 0.5 * rhou * rhou / rho;
+
+            double Y[nsp];
+            std::string Y_string;
+            get_massfractions(nsp, rho, U + dim + 2, Y, Y_string, gas->speciesNames());
+            set_mixture_TRY(gas, T_guess, rho, Y);
+
+            T_final = get_temperature_from_energy(gas, e);
+            gas->setTemperature(T_final);
+
+            // gas->setMassFractionsByName(Y_string);
+            // gas->setState_UV(e, nu);
             P[ie * (nq) + iq] = gas->pressure();
         }
     }
@@ -85,7 +125,7 @@ std::unique_ptr<ThermoPhase> gas(newPhase(filename));
             gam[ie * (nq) + iq] = gas->cp_mass() / gas->cv_mass();
         }
     }
-} // end get_pressure
+} // end get_specificheatratio
 
 
 void get_temperature(const double* Uq, double* T, int ne, int nq, 
@@ -223,4 +263,39 @@ std::unique_ptr<ThermoPhase> gas(newPhase(filename));
 //     }
 
 // }
+
+
+// void get_pressure(const double* Uq, double* P, int ne, int nq, 
+//     int ns, int nsp, int dim, char* filename)
+// {
+
+// // Create a new phase
+// std::unique_ptr<ThermoPhase> gas(newPhase(filename));
+// // IdealGasMix gas(filename);
+// // #pragma omp parallel for schedule(static, 1)
+//     for (int ie = 0; ie < ne; ie++){
+//         for (int iq = 0; iq < nq; iq++){
+
+//             auto start = ie * (nq*ns) + iq * ns;
+//             const double *U = Uq + start;
+//             const double rho = U[0];
+//             const double rhou = U[1];
+//             const double rhoE = U[2];
+
+//             auto e = rhoE / rho - 0.5 * rhou * rhou / rho;
+//             auto nu = 1.0 / rho;
+
+//             double Y[nsp];
+//             std::string Y_string;
+//             get_massfractions(nsp, rho, U + dim + 2, Y, Y_string, gas->speciesNames());
+//             gas->setMassFractionsByName(Y_string);
+//             gas->setState_UV(e, nu);
+//             P[ie * (nq) + iq] = gas->pressure();
+//         }
+//     }
+// } // end get_pressure
+
+
+
+
 } // end extern C
