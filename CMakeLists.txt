@@ -10,6 +10,7 @@ include_directories($ENV{CANTERA_ROOT}/include /home/ihme/bornhoft/utilities/sun
 link_directories($ENV{CANTERA_ROOT}/lib /home/ihme/bornhoft/utilities/sundials/sundials-3.1.1/install/lib)
 
 add_library(quail_cantera_interface SHARED
+    src/interface.cpp
     src/thermo.cpp
     src/helpers.cpp
 )
