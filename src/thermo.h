@@ -1,8 +1,4 @@
 #include "cantera/thermo.h"
-#include "cantera/IdealGasMix.h"
-
-
-
 #include <iostream>
 
 #define GAS_CONSTANT 8.3144621000e3 // [J / (K kmole)]

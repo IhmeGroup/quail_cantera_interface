@@ -2,6 +2,7 @@
 #include <iostream>
 #include <omp.h>
 #include "thermo.h"
+#include "transport.h"
 #include "helpers.h"
 #include <limits>
 #include "cantera/kinetics.h"
@@ -165,6 +166,45 @@ double Wk;
 	       }
         } // end nq loop
     } // end ne loop
-} // end get_temperature_interface
+} // end get_net_production_rates_interface
+
+void get_tranport_properties(const double* Uq, double* mu, double* kap, double* Dk,
+    int ne, int nq, int ns, int nsp, int dim, char* filename)
+{
+
+// Create a new phase
+std::unique_ptr<ThermoPhase> gas(newPhase(filename));
+// Create transport manager
+std::unique_ptr<Transport> trans(newDefaultTransportMgr(gas.get()));
+
+double T;
+    for (int ie = 0; ie < ne; ie++){
+        for (int iq = 0; iq < nq; iq++){
+            
+            auto start = ie * (nq*ns) + iq * ns;
+            const double *U = Uq + start;
+            const double rho = U[0];
+            const double rhoE = U[dim + 1];
+            double rhoKE = 0;
+            for (int id = 0; id < dim; id++){
+                rhoKE = rhoKE + U[id + 1] * U[id + 1] / rho;
+            }
+            auto e = (rhoE - 0.5 * rhoKE) / rho;
+
+            double Y[nsp];
+            get_massfractions(nsp, rho, U + dim + 2, Y);
+            T = get_T(gas, rho, e, Y);
+            double d[nsp];
+            mu[ie * nq + iq] = get_viscosity_from_temperature(gas, trans, T);
+            kap[ie * nq + iq] = get_thermalconductivity_from_temperature(gas, trans, T);
+
+            trans->getMixDiffCoeffsMass(d);
+            for (int isp = 0; isp < nsp; isp++){
+                Dk[ie * nq * nsp + iq * nsp + isp] = d[isp];
+            }
+        } // end nq loop
+    } // end ne loop
+
+} // end get_tranport_properties
 
 } // end extern "C"
