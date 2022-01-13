@@ -3,11 +3,11 @@ import numpy as np
 import os
 import time
 
-LIB = ctypes.cdll.LoadLibrary('./build/libcombustor.so')
+LIB = ctypes.cdll.LoadLibrary('../build/libquail_cantera_interface.so')
 
 def main():
 	ne = [10, 100, 1000, 10000]
-	nq = 3; ns = 5;
+	nq = 3; ns = 5; nsp = 2
 
 	for ie in range(len(ne)):
 		ne_=ne[ie]
@@ -24,15 +24,18 @@ def main():
 			Uq[:, :, 4] = 0.79
 
 			P = np.zeros([ne_, nq, 1])
-
+			CANTERA_FILENAME = "air_test.xml"
 			# lib = ctypes.cdll.LoadLibrary('./build/libcombustor.so')
-			LIB.get_pressure_multithread(
-					ctypes.c_void_p(Uq.ctypes.data), 
-					ctypes.c_void_p(P.ctypes.data),
-					ctypes.c_int(ne_), 
-					ctypes.c_int(nq), 
-					ctypes.c_int(ns),
-						)
+			LIB.get_pressure_interface(
+				ctypes.c_void_p(Uq.ctypes.data), 
+				ctypes.c_void_p(P.ctypes.data),
+				ctypes.c_int(ne_), 
+				ctypes.c_int(nq), 
+				ctypes.c_int(ns),
+				ctypes.c_int(nsp),
+				1,
+				ctypes.c_char_p(CANTERA_FILENAME.encode('utf-8'))
+				)
 			print(P)
 			t1 = time.time()
 			avg += (t1 - t0)
