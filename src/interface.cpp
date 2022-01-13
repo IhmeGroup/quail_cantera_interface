@@ -4,7 +4,7 @@
 #include "thermo.h"
 #include "helpers.h"
 #include <limits>
-
+#include "cantera/kinetics.h"
 
 extern "C" {
 
@@ -16,7 +16,8 @@ void get_pressure_interface(const double* Uq, double* P, int ne, int nq,
 {
 
 // Create a new phase
-std::unique_ptr<IdealGasMix> gas(new IdealGasMix(filename));
+// std::unique_ptr<IdealGasMix> gas(new IdealGasMix(filename));
+    std::unique_ptr<ThermoPhase> gas(newPhase(filename));
     for (int ie = 0; ie < ne; ie++){
         for (int iq = 0; iq < nq; iq++){
 
@@ -42,7 +43,7 @@ void get_wavespeed_interface(const double* Uq, double* gamma, double* P, int ne,
 {
 
 // Create a new phase
-std::unique_ptr<IdealGasMix> gas(new IdealGasMix(filename));
+std::unique_ptr<ThermoPhase> gas(newPhase(filename));
 
 // #pragma omp parallel for schedule(static, 1)
     for (int ie = 0; ie < ne; ie++){
@@ -71,7 +72,7 @@ void get_temperature_interface(const double* Uq, double* T, int ne, int nq,
 {
 
 // Create a new phase
-std::unique_ptr<IdealGasMix> gas(new IdealGasMix(filename));
+std::unique_ptr<ThermoPhase> gas(newPhase(filename));
 
 // #pragma omp parallel for schedule(static, 1)
     for (int ie = 0; ie < ne; ie++){
@@ -100,7 +101,7 @@ void get_gamma_interface(const double* Uq, double* gamma, int ne, int nq,
 {
 
 // Create a new phase
-std::unique_ptr<IdealGasMix> gas(new IdealGasMix(filename));
+std::unique_ptr<ThermoPhase> gas(newPhase(filename));
 
 // #pragma omp parallel for schedule(static, 1)
     for (int ie = 0; ie < ne; ie++){
@@ -128,10 +129,12 @@ std::unique_ptr<IdealGasMix> gas(new IdealGasMix(filename));
 void get_net_production_rates_interface(const double* Uq, double* S, int ne, int nq, 
     int ns, int nsp, int dim, char* filename)
 {
-typedef std::numeric_limits< double > dbl;
-std::cout.precision(dbl::max_digits10);
+
 // Create a new phase
-std::unique_ptr<IdealGasMix> gas(new IdealGasMix(filename));
+std::unique_ptr<ThermoPhase> gas(newPhase(filename));
+
+std::vector<ThermoPhase *> phases_{gas.get()};
+std::unique_ptr<Kinetics> kin(newKineticsMgr(gas->xml(), phases_));
 double T;
 double Wk;
 // #pragma omp parallel for schedule(static, 1)
@@ -153,7 +156,7 @@ double Wk;
             get_massfractions(nsp, rho, U + dim + 2, Y);
             T = get_T(gas, rho, e, Y);
 
-            gas->getNetProductionRates(wdot);
+            kin->getNetProductionRates(wdot);
 
 	       // multiply wdot by molecular weights
 	       for (int is = 0; is < nsp - 1; is++){
